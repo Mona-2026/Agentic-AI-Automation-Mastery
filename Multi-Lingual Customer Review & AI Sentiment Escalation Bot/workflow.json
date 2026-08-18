@@ -1,0 +1,451 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-feedback",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7580b405-6608-4b8e-aaa7-e8b6b4a30664",
+      "name": "Webhook",
+      "webhookId": "001b0d5e-1969-4585-9602-5c5ea1658429"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c29730d2-9866-465b-9f3f-8747e47f1d93",
+              "leftValue": "={{ $json.body.customer_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2e1b5144-77c3-4999-82d6-08ef1471c3d1",
+              "leftValue": "={{ $json.body.booking_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "abbb6fa1-6686-47d8-a565-1b99a7fb6542",
+              "leftValue": "={{ $json.body.feedback_text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "04441275-86fa-4f61-82de-a113d5b07286",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Analyze the following customer review. Identify the original language, translate the text into English, and classify customer sentiment as (Extremely Angry, Neutral, or Delighted). Return structured JSON with keys: original_language, translated_text, sentiment, churn_risk_score (0-100), and key_complaints.\n\ncustomer review:  {{ $('Webhook').item.json.body.feedback_text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        -16
+      ],
+      "id": "141044c3-bc02-4601-8407-50cd83a21455",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output[0].content[0].text.sentiment }}",
+                    "rightValue": "Extremely Angry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "97d03b30-66ed-4a33-b1d2-5252c92948ac"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a1fbc860-1c2c-43ee-827b-2a5ae68cf286",
+                    "leftValue": "={{ $json.output[0].content[0].text.sentiment }}",
+                    "rightValue": "Neutral",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "31897ed4-ada1-4951-9968-5cf62bde0b86",
+                    "leftValue": "={{ $json.output[0].content[0].text.sentiment }}",
+                    "rightValue": "Delighted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        -96
+      ],
+      "id": "79b385c1-d908-4065-b84d-380bcadc34a8",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "=🚨 URGENT: High Churn Risk Escalation - Booking #{{ $('Webhook').item.json.body.booking_id }}",
+        "emailType": "text",
+        "message": "=🚨 HIGH CHURN RISK CUSTOMER ESCALATION ALERT 🚨\n\nDear Manager,\n\nOur automated AI Sentiment Engine has flagged a high-risk customer complaint that requires your immediate attention to prevent churn[cite: 1]. \n\nBelow are the incident details and feedback analysis:\n\n==================================================\nINCIDENT METADATA\n==================================================\n• Booking Reference : {{ $('Webhook').item.json.body.booking_id }}\n• Customer Email    : {{ $('Webhook').item.json.body.customer_email }}\n• Sentiment Status  : {{ $json.output[0].content[0].text.sentiment }}\n• Churn Risk Score  : {{ $json.output[0].content[0].text.churn_risk_score }} / 100\n• Original Language : {{ $json.output[0].content[0].text.original_language }}\n\n==================================================\nTRANSLATED FEEDBACK SUMMARY\n==================================================\n\"{{ $json.output[0].content[0].text.translated_text }}\"\n\n==================================================\nKEY OPERATIONAL ISSUES IDENTIFIED\n==================================================\n{{ $('Message a model').item.json.output[0].content[0].text.key_complaints }}\n\n==================================================\nACTION REQUIRED:\nPlease initiate outreach to the customer directly at {{ $('Webhook').item.json.body.customer_email }} as soon as possible to resolve this matter.\n\n--\nAutomated AI Reputation & Escalation Engine[cite: 1]\nConfidential • Internal Operations Use Only",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        -256
+      ],
+      "id": "a80a7480-605c-46f7-88af-b340c8825d02",
+      "name": "Send a message",
+      "webhookId": "32da9de0-e4ca-4b61-b3c9-d6da690d2521",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.customer_email }}",
+        "subject": "=We received your feedback regarding Booking #{{ $('Webhook').item.json.body.booking_id }}",
+        "emailType": "text",
+        "message": "=Hi there,\n\nThank you for reaching out to us and sharing your feedback.\n\nWe have logged your notes regarding your booking (#{{ $('Webhook').item.json.body.booking_id }}).\n\nOur support team is reviewing your comments and will follow up if any further action or documentation is required.\n\nBest regards,\nCustomer Support Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        -80
+      ],
+      "id": "38c4f89d-8947-47f0-ac02-2ae724dd9b60",
+      "name": "Send a message1",
+      "webhookId": "ed656335-b480-48a5-934c-27956894a7f9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.customer_email }}",
+        "subject": "Thank you for your review! Here is a gift from us 🎁",
+        "emailType": "text",
+        "message": "Hi there, \n\nThank you so much for your wonderful feedback! We are thrilled to hear about your great experience.  As a token of our appreciation, use code THANKYOU10 on your next booking for 10% off!\n\nBest regards, \nCustomer Experience Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        112
+      ],
+      "id": "fbf75f7c-a690-4f28-814a-e3118c7476b9",
+      "name": "Send a message2",
+      "webhookId": "6b4a27f3-3019-4265-8aed-3c0279bd8a98",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "1b387c9f-88af-4905-a0ab-77a2c536bfc3",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "tableId": "customer-feedback",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_email",
+              "fieldValue": "={{ $('Webhook').item.json.body.customer_email }}"
+            },
+            {
+              "fieldId": "booking_id",
+              "fieldValue": "={{ $('Webhook').item.json.body.booking_id }}"
+            },
+            {
+              "fieldId": "original_feedback",
+              "fieldValue": "={{ $('Webhook').item.json.body.feedback_text }}"
+            },
+            {
+              "fieldId": "original_language",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.original_language }}"
+            },
+            {
+              "fieldId": "translated_text",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.translated_text }}"
+            },
+            {
+              "fieldId": "sentiment",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.sentiment }}"
+            },
+            {
+              "fieldId": "churn_risk_score",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.churn_risk_score }}"
+            },
+            {
+              "fieldId": "key_complaints",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.key_complaints }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        -80
+      ],
+      "id": "873300af-ad77-41dd-9c29-fe4ad16f770b",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
