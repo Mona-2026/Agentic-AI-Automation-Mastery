@@ -1,0 +1,719 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "LeadScoutAI",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "50b21ab2-afb8-4926-870f-475e44193381",
+      "name": "Webhook Trigger",
+      "webhookId": "cbcface8-bf19-4886-a16f-82babab30ae1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/actors/compass~crawler-google-places/run-sync-get-dataset-items",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"searchStringsArray\": [\n    \"{{ $json.body.business_type }} in {{ $json.body.target_location }}\"\n  ],\n  \"maxCrawledPlacesPerSearch\": {{ parseInt($json.body.lead_limit) || 5 }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "7771cad7-e842-4272-ac23-a871226a602c",
+      "name": "Apify Places Scraper"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8960b2f6-406d-49f0-872c-da436f4a5670",
+              "leftValue": "=={{ $json.website }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f63f6c07-4b5b-4bcc-83b5-dd879a2324ee",
+              "leftValue": "=={{ $json.website }}",
+              "rightValue": "http",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "43eed4d1-3ece-484f-acaf-0f9d15291609",
+      "name": "Filter Valid Websites"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze the following business details and website URL to extract the primary public business email address.\n\nBusiness Name: {{ $json.title }}\nWebsite: {{ $json.website }}\n\nReturn ONLY a raw JSON object with a single key \"email\". If no email is found, return null for \"email\". Do not include Markdown formatting or markdown ticks."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "e0f5d7cc-bd68-4823-969b-ce05a9e623e2",
+      "name": "Gemini Email Extractor",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "XrpRqO0mF2jhqU66",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  try {\n    const rawText = item.json.content?.parts?.[0]?.text || '';\n    const parsed = JSON.parse(rawText);\n    item.json.email = parsed.email || null;\n  } catch (e) {\n    item.json.email = null;\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "de819451-3611-4dd0-a994-e7647bea6d2c",
+      "name": "Parse Email JSON"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w",
+          "mode": "list",
+          "cachedResultName": "leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company Name": "={{ $('Filter Valid Websites').item.json.title }}",
+            "Business Category": "={{ $('Filter Valid Websites').item.json.categoryName }}",
+            "Website URL": "={{ $('Filter Valid Websites').item.json.website }}",
+            "Cold Mail Status": "Pending",
+            "Exracted Email Address": "={{ $json.email }}",
+            "Phone Number": "={{ $('Filter Valid Websites').item.json.phoneUnformatted || $('Filter Valid Websites').item.json.phone || 'N/A' }}",
+            "Physical Address": "={{ $('Filter Valid Websites').item.json.address }}",
+            "Send Time": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Business Category",
+              "displayName": "Business Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website URL",
+              "displayName": "Website URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone Number",
+              "displayName": "Phone Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Exracted Email Address",
+              "displayName": "Exracted Email Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Physical Address",
+              "displayName": "Physical Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cold Mail Status",
+              "displayName": "Cold Mail Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Send Time",
+              "displayName": "Send Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1424,
+        -128
+      ],
+      "id": "f2fff6e3-cc51-4755-b5f8-c09b8821d63f",
+      "name": "Log Pending Leads.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NwjH7UPfi94NK5dN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are an expert B2B cold outreach specialist. Write a concise, personalized, high-converting cold email offering tailored services to local businesses.\n\nRules:\n1.Keep it under 120 words.\n2.Friendly, professional, and non-pushy tone.\n3.Clear Call-to-Action (CTA) for a 5-minute call.\n4.Do not include subject line placeholders inside the email body."
+            },
+            {
+              "content": "=Write a personalized cold email for this business:\n\n- Company Name: {{ $('Filter Valid Websites').item.json.title }}\n- Business Type: {{ $('Webhook Trigger').item.json.body.business_type }}\n- City/Location: {{ $('Webhook Trigger').item.json.body.target_location }}\n- Website: {{ $('Filter Valid Websites').item.json.website }}\n- Rating: {{ $('Filter Valid Websites').item.json.totalScore }}\n- Reviews: {{ $('Filter Valid Websites').item.json.reviewsCount }}\n- Contact Email: {{ $('Parse Email JSON').item.json.email }}\n\nGoal: Briefly highlight how our solutions can help {{ $('Filter Valid Websites').item.json.title }} get more client inquiries and improve their online workflow in {{ $('Webhook Trigger').item.json.body.target_location }}.\n\nSender Details to use at the end of the email:\n- Name: Muhammad Sameer\n- Company: Automated Outreach Solutions\n\nSign off professionally using these exact sender details (do not leave any empty brackets)."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        -112
+      ],
+      "id": "bca1c696-3d8a-4d9e-bd13-48bc0535a25b",
+      "name": "OpenAI Draft Generator",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w",
+          "mode": "list",
+          "cachedResultName": "leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1d93fS31YfOJynjxUV56kEnW0S_V5FtAbQ8vsdXjad1w/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": 0,
+            "Exracted Email Address": "={{ $('Parse Email JSON').item.json.email }}",
+            "Cold Mail Status": "Completed.",
+            "Send Time": "={{ $now.setZone('Asia/Karachi').format('yyyy-MM-dd HH:mm:ss') }}"
+          },
+          "matchingColumns": [
+            "Exracted Email Address"
+          ],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Business Category",
+              "displayName": "Business Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website URL",
+              "displayName": "Website URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone Number",
+              "displayName": "Phone Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Exracted Email Address",
+              "displayName": "Exracted Email Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Physical Address",
+              "displayName": "Physical Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cold Mail Status",
+              "displayName": "Cold Mail Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Send Time",
+              "displayName": "Send Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2656,
+        -112
+      ],
+      "id": "9a02651d-c395-462f-8068-18a781a77190",
+      "name": "Update Sheet Status & Time",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NwjH7UPfi94NK5dN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        96
+      ],
+      "id": "48ccb9b7-446d-4977-ae85-a3bd17748611",
+      "name": "Discard Invalid Lead"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4bccd3a6-2eb8-4063-8798-549a64dc281d",
+              "name": "coldEmail",
+              "value": "={{ $json.output[0].content[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "55e80980-d1cd-4863-b075-5a736441862f",
+              "name": "recipientEmail",
+              "value": "={{ $('Parse Email JSON').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "9f92682e-7ca7-4a1f-a487-ad42e61df28f",
+              "name": "companyName",
+              "value": "={{ $('Filter Valid Websites').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "12cae036-efc3-48ff-aa3d-3a28faaa594b",
+              "name": "status",
+              "value": "Ready to send.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2192,
+        -112
+      ],
+      "id": "dd01364f-8433-4cb1-ba23-432848a7a9e7",
+      "name": "Prepare Email Data"
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com",
+        "subject": "=Quick question regarding {{ $json.companyName }}",
+        "emailType": "text",
+        "message": "={{ $json.coldEmail }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2416,
+        -112
+      ],
+      "id": "4e337724-3bb3-4159-a4ca-f3470ce2510e",
+      "name": "Send Cold Email (Gmail)",
+      "webhookId": "9e18e34e-931c-4c67-851f-47efc565dec6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "585ce4ad-2fba-49a7-98fa-6f49348ff08f",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "@",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        0
+      ],
+      "id": "5d815ab7-5c9a-4a38-a2d8-6dd4cb3af6e2",
+      "name": "Has Valid Email?"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1632,
+        -128
+      ],
+      "id": "96b1aad6-31c4-4ccd-8c8f-436df0a81e26",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        -112
+      ],
+      "id": "d4460b4b-6b4b-435f-bf1e-738ac2aa7166",
+      "name": "Wait 2 Seconds",
+      "webhookId": "0c70df0e-6121-4dcf-95b3-c004d4827b5f"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Apify Places Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify Places Scraper": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Websites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Websites": {
+      "main": [
+        [
+          {
+            "node": "Gemini Email Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Email Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse Email JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email JSON": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Pending Leads.": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Draft Generator": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet Status & Time": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Send Cold Email (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Cold Email (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet Status & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Log Pending Leads.",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard Invalid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "OpenAI Draft Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
