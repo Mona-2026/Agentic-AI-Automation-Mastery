@@ -1,0 +1,1119 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/index.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/dns-json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        192
+      ],
+      "id": "23e7cf24-b21f-4874-9a0c-1b8624702310",
+      "name": "HTTP Request - MITRE ATT&CK",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.greynoise.io/v3/community/{{ $json.iocs?.ips?.[0] || '8.8.8.8' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "2Snh4nmS5TTvPW2TCRv0vIrJLSp44qjJzKaU8SOiCpOYqQhySTdNrNaKXrn2NFPx"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        32
+      ],
+      "id": "5308b4b7-f10f-4ad5-8860-0820d88d3289",
+      "name": "HTTP Request - GreyNoise",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/files/{{ $json.iocs.hashes_sha256[0] }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "15db98bba23008fc3c0c892cccdbc12d7de6de1b92a2573ace80fad08a49453a"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        -144
+      ],
+      "id": "a9665e5c-7a9c-4ec0-b11d-9486f1d887c6",
+      "name": "HTTP Request - VirusTotal",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "=ipAddress",
+              "value": "={{ $json.iocs?.ips?.[0] || '127.0.0.1' }}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Key",
+              "value": "d396d3453a547a1011b803c0b31cce3ccbc75acefa8606e1c2d14582f98d4168a688c3841ec35bf3"
+            },
+            {
+              "name": "Accept",
+              "value": "Application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        -336
+      ],
+      "id": "aa9d5146-d901-479b-b693-244507bd93f4",
+      "name": "HTTP Request - AbuseIPDB"
+    },
+    {
+      "parameters": {
+        "tableId": "incidents",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "incident_id",
+              "fieldValue": "={{ $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.incident_id }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.category }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "={{ $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.severity }}"
+            },
+            {
+              "fieldId": "similarity_score",
+              "fieldValue": "={{ $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.similarity_score }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.summary }}"
+            },
+            {
+              "fieldId": "resolution_status",
+              "fieldValue": "=={{ $('Incident Analyzer').item.json.output[0].content[0].text.severity === 'Critical' ? 'Immediate Action Required' : 'Investigating' }}"
+            },
+            {
+              "fieldId": "vector_id",
+              "fieldValue": "=={{ $('Code in JavaScript1').item.json.vector_id }}"
+            },
+            {
+              "fieldId": "metrics",
+              "fieldValue": "=confidence: {{ $('Incident Analyzer').item.json.output[0].content[0].text.confidence }} | | Severity Score: {{ $('Incident Analyzer').item.json.output[0].content[0].text.severity_score }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3472,
+        -240
+      ],
+      "id": "5692a352-7a6b-4b13-a642-a85e1a768d5e",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=={{ 'Incident-' + $('Reporting Agent').item.json.output[0].content[0].text.supabase_record.incident_id + '.pdf' }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1vGlj4lWoZEmc_M6TVqT2VPrrwUlTWP_H",
+          "mode": "list",
+          "cachedResultName": "Incidents",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1vGlj4lWoZEmc_M6TVqT2VPrrwUlTWP_H"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3520,
+        32
+      ],
+      "id": "e0ba3ee9-332c-4547-bf01-f35055145aa5",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "trwWDhzcuKY8NOkq",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3296,
+        32
+      ],
+      "id": "8fd69377-72de-4f6d-8a50-948b77079242",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "={{ $json.output[0].content[0].text.email_subject }}",
+        "emailType": "text",
+        "message": "={{ $json.output[0].content[0].text.email_body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3264,
+        -240
+      ],
+      "id": "bf55324a-6922-4e1f-99ec-db72f1a91622",
+      "name": "Send a message",
+      "webhookId": "dc94b3c9-d466-425d-b3ae-0a421190895c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a SOC Reporting Agent. Compile the incident analysis, comparison (if any), and recommendation into a professional executive email briefing.\n\nOutput JSON:\n{\n  \"email_subject\": \"concise, severity-first subject line\",\n  \"email_body\": \"a fully formatted PLAIN TEXT email — see structure below\",\n  \"supabase_record\": {\"incident_id\": \"\", \"category\": \"\", \"severity\": \"\", \"similarity_score\": \"\", \"summary\": \"\", \"resolution_status\": \"open\"}\n}\n\nThe \"email_body\" field must be plain text with actual newline characters (\\n\\n between paragraphs, \\n between list items) structured as:\n\n1. Greeting line: \"Hi Team,\"\n2. Blank line\n3. Short paragraph stating what happened and its severity\n4. Blank line\n5. Paragraph with historical context (or note this is a first-seen incident)\n6. Blank line\n7. \"Recommended immediate actions:\" followed by a short list, each item on its own line starting with \"- \"\n8. Blank line\n9. Closing line asking for escalation if needed\n10. Blank line\n11. Sign-off: \"Regards,\\nAI SOC Memory Engine\"\n\nKeep total length under 200 words. Tone: calm, precise, no jargon a non-technical exec can't parse. Lead with severity and business impact."
+            },
+            {
+              "content": "==Incident Analysis:\n{{ JSON.stringify($('Incident Analyzer').item.json) }}\n\nRecommendation Playbook:\n{{ $json.output[0].content[0].text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2832,
+        -240
+      ],
+      "id": "64938203-f299-4bbf-a433-dabe55f42aa2",
+      "name": "Reporting Agent",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a SOC Recommendation Agent. Given the incident analysis and (if available) the comparison against a historical match, produce a prioritized, numbered mitigation playbook a Tier-1 analyst can execute immediately. Include:\n1. Immediate containment steps\n2. Investigation steps to confirm scope\n3. Remediation steps\n4. Escalation criteria — when to involve Tier-2/Tier-3\nIf a historical match with a documented resolution exists, prefer proven steps from that resolution and note this explicitly. Output as clean numbered markdown, not JSON."
+            },
+            {
+              "content": "==Incident Analysis:\n{{ JSON.stringify($('Incident Analyzer').item.json) }}\n\nComparison / Historical Context:\n{{ $json.relationship ? JSON.stringify($json) : 'No historical match found — this is a new or first-seen incident pattern.' }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2528,
+        -240
+      ],
+      "id": "6b1a6b3b-87f6-4f51-b4ff-4e856a2e23f4",
+      "name": "Recommendation Agent",
+      "executeOnce": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2352,
+        -240
+      ],
+      "id": "fdc82ffa-f38b-44f2-8b91-05037576a317",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a SOC Incident Analyst. Given a raw SIEM log, its extracted IOCs, and threat intelligence API results, produce ONLY valid JSON with these fields:\n{\n  \"incident_id\": \"auto-generated UUID or timestamp-based ID\",\n  \"attack_category\": \"Brute Force | Malware | Phishing | PowerShell Execution | Other\",\n  \"severity\": \"Critical | High | Medium | Low\",\n  \"severity_score\": \"1-10\",\n  \"mitre_attack_mapping\": [{\"tactic\": \"\", \"technique_id\": \"\", \"technique_name\": \"\"}],\n  \"root_cause_summary\": \"2-3 sentence plain-English summary of what happened and how\",\n  \"affected_assets\": [],\n  \"confidence\": \"0.0-1.0 based on how conclusive the evidence is\"\n}\nBase every field strictly on the provided data. Do not invent IOCs or facts not present in the input."
+            },
+            {
+              "content": "==Raw Log:\n{{ $json.raw_log }}\n\nExtracted IOCs:\n{{ JSON.stringify($json.iocs) }}\n\nThreat Intelligence Results:\n{{ JSON.stringify($json.threat_intel) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1280,
+        -240
+      ],
+      "id": "7cc7926c-45f3-4335-833c-6aa77f86c76e",
+      "name": "Incident Analyzer",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6f3c3588-e682-4996-9519-59881553b040",
+              "leftValue": "={{ $json[0]?.score ?? 0 }}",
+              "rightValue": 0.9,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2096,
+        -240
+      ],
+      "id": "6e7271da-6573-4dc5-bbc8-0e7afe56cd29",
+      "name": "If",
+      "executeOnce": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1024
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        3280,
+        -496
+      ],
+      "id": "359d2f72-0a65-45f5-9e28-3f0fa4baf304",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "ai-soc-memory",
+          "mode": "list",
+          "cachedResultName": "ai-soc-memory"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        3280,
+        -704
+      ],
+      "id": "10f98e0e-122d-44ce-beaa-61067c14c986",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "MPffoh6dwTItz7xE",
+          "name": "Pinecone account"
+        }
+      },
+      "notes": "Always Output Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8b5a50c-9da7-40ab-8749-62b73f54305b",
+              "name": "=raw_log",
+              "value": "={{ $('Switch').item.json.raw_log }}",
+              "type": "string"
+            },
+            {
+              "id": "283cf9eb-078c-4814-9de8-c7b36ef834dd",
+              "name": "=iocs",
+              "value": "={{ $('Switch').item.json.iocs }}",
+              "type": "object"
+            },
+            {
+              "id": "8ddd4b44-2e0f-47c6-ad8a-15ff0cc5df27",
+              "name": "=threat_intel",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        -240
+      ],
+      "id": "9fd16f41-9fdc-49d4-8717-fc9b85671fe1",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        -272
+      ],
+      "id": "d3dd56b9-8743-4d36-98a2-1c4c7802aecf",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.raw_log.toLowerCase().includes('powershell') || $json.raw_log.toLowerCase().includes('-enc') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "18107c4b-f0fe-47fd-a5ba-a5e86a14b316"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1fb30e62-2ff6-4032-98b7-9393407cae3a",
+                    "leftValue": "={{ $json.raw_log.toLowerCase().includes('trojan') || $json.raw_log.toLowerCase().includes('ransomware') || $json.raw_log.toLowerCase().includes('malware') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d7f19312-39c2-48ed-a51e-8b429c3849b2",
+                    "leftValue": "={{ $json.raw_log.toLowerCase().includes('failed login') || $json.raw_log.toLowerCase().includes('authentication failure') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "77911ae9-d084-4956-8176-cf92c27c016b",
+                    "leftValue": "={{ $json.raw_log.toLowerCase().includes('phishing') || $json.raw_log.toLowerCase().includes('credential') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        -48
+      ],
+      "id": "e69303d4-f0b8-4b76-a40b-767bef5157c2",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nconst text =\n  item.json.text ||\n  item.json.data ||\n  item.json.extractedText ||\n  item.json.content ||\n  (item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf-8') : null);\n\nif (!text) {\n  throw new Error('No text found. Available json keys: ' + JSON.stringify(Object.keys(item.json)));\n}\n\nconst iocs = {\n  ips: [...new Set(text.match(/\\b\\d{1,3}(\\.\\d{1,3}){3}\\b/g) || [])],\n  hashes_md5: [...new Set(text.match(/\\b[a-fA-F0-9]{32}\\b/g) || [])],\n  hashes_sha256: [...new Set(text.match(/\\b[a-fA-F0-9]{64}\\b/g) || [])],\n  urls: [...new Set(text.match(/https?:\\/\\/[^\\s\"']+/g) || [])],\n  usernames: [...new Set([...text.matchAll(/user\\s*(?:account|name)?\\s*[:=]\\s*[\\r\\n]*\\s*([^\\r\\n]+)/gi)].map(m => m[1].trim()))],\n  hostnames: [...new Set([...text.matchAll(/host\\s*name?\\s*[:=]\\s*[\\r\\n]*\\s*([^\\r\\n]+)/gi)].map(m => m[1].trim()))],\n};\n\nreturn [{ json: { raw_log: text, iocs } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -128
+      ],
+      "id": "e41394e7-76b7-4d84-96de-03854135ab1b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "e2fcbcf2-e7d3-49f0-8a5e-ac3779fbf2ba",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soc-log-ingest",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "fc333d2f-268d-4ea7-977f-bc5a0c16aa81",
+      "name": "Webhook",
+      "webhookId": "704a7604-5292-48a1-a72d-2d6b91744408"
+    },
+    {
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "category",
+                "value": "=={{ $('Code in JavaScript1').item.json.metadata.category }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        3456,
+        -496
+      ],
+      "id": "185fa59c-aaa2-46bb-adce-da36b82da4dd",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a SOC Comparison Agent. You receive the CURRENT incident analysis and the TOP MATCHING HISTORICAL incident (with its similarity score). Compare them and return JSON:\n{\n  \"relationship\": \"exact repeat | variant | evolved attack\",\n  \"shared_indicators\": [],\n  \"new_or_changed_indicators\": [],\n  \"key_differences\": \"plain-English explanation of what changed since last time\",\n  \"reused_from_history\": \"what worked last time and can be reused now\"\n}\nBe specific — name the actual IOCs and techniques that match or differ, don't speak in generalities."
+            },
+            {
+              "content": "==Current Incident:\n{{ JSON.stringify($('Incident Analyzer').item.json) }}\n\nHistorical Match (similarity score: {{ $json.matches ? $json.matches[0].score : ($json[0]?.score ?? 'unknown') }}):\n{{ JSON.stringify($json.matches ? $json.matches[0].metadata : ($json[0]?.metadata ?? {})) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2352,
+        -528
+      ],
+      "id": "1440bd6d-1115-4071-a5f7-928bf068c5fc",
+      "name": "Comparision Agent",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst analysis = item.json.output[0].content[0].text;\n\nfunction generateUUID() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3f | 0x80)).toString(16);\n  });\n}\n\nconst vectorId = generateUUID();\nconst textToEmbed = `Category: ${analysis.attack_category}\\nSeverity: ${analysis.severity}\\nSummary: ${analysis.root_cause_summary}`;\n\nreturn [{\n  json: {\n    vector_id: vectorId,\n    pageContent: textToEmbed,\n    metadata: { category: analysis.attack_category, severity: analysis.severity },\n    raw_log: item.json\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        -240
+      ],
+      "id": "a72bc044-6519-43ca-a157-f3389e39426b",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "ai-soc-memory",
+          "mode": "list",
+          "cachedResultName": "ai-soc-memory"
+        },
+        "prompt": "={{ $('Incident Analyzer').item.json.output[0].content[0].text.root_cause_summary }}",
+        "topK": 3,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1792,
+        -240
+      ],
+      "id": "1dc62a53-e6ed-4f63-8b33-6d691c82c5a2",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "MPffoh6dwTItz7xE",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1024
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        -80
+      ],
+      "id": "41fd2d7b-3aa9-4b77-a9a9-6263cd79ab6f",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "HTTP Request - MITRE ATT&CK": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "HTTP Request - GreyNoise": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "HTTP Request - VirusTotal": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP Request - AbuseIPDB": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reporting Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recommendation Agent": {
+      "main": [
+        [
+          {
+            "node": "Reporting Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Recommendation Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incident Analyzer": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Comparision Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Incident Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - VirusTotal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request - VirusTotal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request - AbuseIPDB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request - GreyNoise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - MITRE ATT&CK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comparision Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
