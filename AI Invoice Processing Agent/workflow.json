@@ -1,0 +1,518 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Invoice",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c6b8322b-f8fa-4f31-81c1-528bae642de9",
+      "name": "Webhook",
+      "webhookId": "6c276ba4-cbc4-4cb6-9e2f-9804423e4739"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "e57c54be-178b-4151-96a4-bf81db667b2c",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert financial document parser. Your job is to analyze raw text extracted from invoice PDFs and output strict, perfectly formatted JSON.\n\nStrict JSON Output Schema Required:\n{\n  \"vendor_name\": \"string\",\n  \"invoice_number\": \"string\",\n  \"amount\": number,\n  \"due_date\": \"YYYY-MM-DD\",\n  \"user_email\": \"string\"\n}\n\nRules:\n1. \"amount\" must be a pure numeric value (float or integer) without currency symbols or commas (e.g., 5250.50, not \"$5,250.50\").\n2. \"due_date\" must strictly follow ISO 8601 format (YYYY-MM-DD). If no due date is found, estimate based on invoice date + 30 days.\n3. \"user_email\" should be extracted if visible; otherwise default to \"billing@company.com\".\n4. Do not return any extra conversational text, commentary, or markdown fences like ```json. Return valid raw JSON only."
+            },
+            {
+              "content": "=Extract all relevant invoice details from the following document text:\n\n{{ $json.text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "5cdf6773-6af7-4652-b56b-e6b3425b611f",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "invoice",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "vendor_name",
+              "condition": "eq",
+              "keyValue": "={{ $json.output[0].content[0].text.vendor_name }}"
+            },
+            {
+              "keyName": "invoice_number",
+              "condition": "eq",
+              "keyValue": "={{ $json.output[0].content[0].text.invoice_number }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        768,
+        0
+      ],
+      "id": "e2944a6c-fa91-4d62-8db0-b3f16774d55c",
+      "name": "Get many rows",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cc662648-2c4e-40d3-a7be-8357df308693",
+              "leftValue": "={{ $json.id ? $json.id.toString() : '' }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        976,
+        0
+      ],
+      "id": "62f90d7e-37be-464e-871a-537cd4208704",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "⚠️ Fraud Alert: Duplicate invoice detected - ",
+        "emailType": "text",
+        "message": "=Attention: Vendor {{ $('Message a model').item.json.output[0].content[0].text.vendor_name }} submitted duplicate invoice number {{ $('Message a model').item.json.output[0].content[0].text.invoice_number }} amounting to {{ $('Message a model').item.json.output[0].content[0].text.amount }}. Processing halted.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1184,
+        -96
+      ],
+      "id": "3b27923f-dab0-473c-b410-cfc10e8937db",
+      "name": "Send a message",
+      "webhookId": "c3453385-0e15-4293-a133-44d3c3578fd6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5a491418-bf8d-44d3-9a69-d508ecb8fddd",
+              "leftValue": "={{ $('Message a model').item.json.output[0].content[0].text.amount }}",
+              "rightValue": 5000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        96
+      ],
+      "id": "78603290-d583-43f5-b83a-1232c12f30d9",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "APPROVAL REQUIRED: High Value Invoice -",
+        "emailType": "text",
+        "message": "=Invoice #{{ $node[\"OpenAI Node\"].json.invoice_number }} from {{ $node[\"OpenAI Node\"].json.vendor_name }} exceeds $5,000 threshold. Please review and approve.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        0
+      ],
+      "id": "aa791676-a650-41f7-ad06-6d7bcb6fcc1f",
+      "name": "Send a message1",
+      "webhookId": "550f6ce7-0c5c-4d9c-94c6-e4cde500b6d2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "invoice",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "vendor_name",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.vendor_name }}"
+            },
+            {
+              "fieldId": "vendor_email",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.user_email }}"
+            },
+            {
+              "fieldId": "invoice_number",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.invoice_number }}"
+            },
+            {
+              "fieldId": "amount",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.amount }}"
+            },
+            {
+              "fieldId": "due_date",
+              "fieldValue": "={{ $('Message a model').item.json.output[0].content[0].text.due_date }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "Processed"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        192
+      ],
+      "id": "aca7f04b-db7b-4a65-bef9-eab0c501ed5b",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1RBha_2vcdIHipJyIcOa3HjoroGfpGXEfTOp305_Bras",
+          "mode": "list",
+          "cachedResultName": "Invoice",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RBha_2vcdIHipJyIcOa3HjoroGfpGXEfTOp305_Bras/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RBha_2vcdIHipJyIcOa3HjoroGfpGXEfTOp305_Bras/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vendor_name": "={{ $('Message a model').item.json.output[0].content[0].text.vendor_name }}",
+            "vendor_email": "={{ $('Message a model').item.json.output[0].content[0].text.user_email }}",
+            "invoice_number": "={{ $('Message a model').item.json.output[0].content[0].text.invoice_number }}",
+            "amount": "={{ $('Message a model').item.json.output[0].content[0].text.amount }}",
+            "due_date": "={{ $('Message a model').item.json.output[0].content[0].text.due_date }}",
+            "status": "Processed"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_email",
+              "displayName": "vendor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1600,
+        192
+      ],
+      "id": "b761a17f-7da2-4a1b-9f70-6835fb4ef75c",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "NwjH7UPfi94NK5dN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.vendor_email }}",
+        "subject": "✅ Invoice Received & Processed -",
+        "emailType": "text",
+        "message": "=Hi {{ $('Message a model').item.json.output[0].content[0].text.vendor_name }}, \nYour invoice has been successfully processed into our accounting system.\nDetails: \nInvoice Number: {{ $('Message a model').item.json.output[0].content[0].text.invoice_number }} \nTotal Amount: {{ $('Message a model').item.json.output[0].content[0].text.amount }}\nDue Date: {{ $('Message a model').item.json.output[0].content[0].text.due_date }} \nThank you,\nAccounts Payable Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        192
+      ],
+      "id": "599c837b-d49c-4dcc-b2c6-9b7b46141920",
+      "name": "Send a message2",
+      "webhookId": "c03cd30f-2ac9-43f3-8cc2-1a7d8cefa3e4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
