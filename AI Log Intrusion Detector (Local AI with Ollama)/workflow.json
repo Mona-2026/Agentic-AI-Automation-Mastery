@@ -1,0 +1,455 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "log-intrusion",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        -64
+      ],
+      "id": "358668c1-e45f-4f1a-8980-edc69ae86700",
+      "name": "Webhook",
+      "webhookId": "1e794a8d-d373-4b09-957c-4c1652714de9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f7c5d540-c628-4772-8658-e07376d0598b",
+              "leftValue": "={{ $json.body.raw_log }}",
+              "rightValue": "Failed Password",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "d4352380-e7cd-456b-87fe-8c543b6494ad",
+              "leftValue": "={{ $json.body.raw_log }}",
+              "rightValue": "error",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "c4cd1482-cb5c-4f10-850f-505b9d24b726",
+              "leftValue": "={{ $json.body.raw_log }}",
+              "rightValue": "40",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "8a252aaa-15af-4cd4-8ab0-12141bde3d38",
+              "leftValue": "={{ $json.body.raw_log }}",
+              "rightValue": "50",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "f6e76ec5-54ae-4314-a234-4fa868b43eb9",
+              "leftValue": "={{ $json.body.raw_log }}",
+              "rightValue": "warn",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        272,
+        -64
+      ],
+      "id": "4a9766cb-473d-487f-8e16-ac121a326a70",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.raw_log }}",
+        "options": {
+          "systemMessage": "Analyze the following server log payload for malicious intent. Identify attack vectors such as Brute-Force, SQL Injection, Cross-Site Scripting (XSS), Path Traversal, or Port Scanning. Return structured JSON with keys: threat_level (Critical/Medium/Low), attack_type, source_ip, summary, and recommended_action.\n\nIMPORTANT: Respond with ONLY a valid JSON object. Do not include any explanation, greeting, or text before or after the JSON. Do not wrap it in markdown code blocks. Your entire response must start with { and end with }."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        544,
+        -224
+      ],
+      "id": "23186c16-5046-4c13-afae-bb65e734ebd0",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama3:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -16
+      ],
+      "id": "79aed345-aef2-4b05-86b2-ffda88af29fe",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "H8INTIHaT0gI87Cq",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let rawOutput = $json.output || $json.text || $json.data || '';\n\nif (typeof rawOutput === 'object' && rawOutput !== null) {\n  return { json: rawOutput, pairedItem: { item: 0 } };\n}\n\nconst jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n\nif (!jsonMatch) {\n  return {\n    json: {\n      threat_level: \"Unknown\",\n      attack_type: \"ParseError\",\n      source_ip: $json.source_ip || \"N/A\",\n      summary: \"AI response was not valid JSON: \" + rawOutput.substring(0, 200),\n      recommended_action: \"Manual review required\"\n    },\n    pairedItem: { item: 0 }\n  };\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonMatch[0]);\n} catch (error) {\n  return {\n    json: {\n      threat_level: \"Unknown\",\n      attack_type: \"ParseError\",\n      source_ip: $json.source_ip || \"N/A\",\n      summary: \"JSON parsing failed: \" + error.message,\n      recommended_action: \"Manual review required\"\n    },\n    pairedItem: { item: 0 }\n  };\n}\n\nreturn {\n  json: {\n    threat_level: parsed.threat_level || \"Unknown\",\n    attack_type: parsed.attack_type || \"Unknown\",\n    source_ip: parsed.source_ip || $json.source_ip || \"N/A\",\n    summary: parsed.summary || \"No summary provided\",\n    recommended_action: parsed.recommended_action || \"No action specified\"\n  },\n  pairedItem: { item: 0 }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -224
+      ],
+      "id": "9ce475b9-8b40-4928-b46d-c53672b21697",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.threat_level }}",
+                    "rightValue": "critical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "12c3e00a-3f0c-4a9c-8ad3-414b292fb848"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "762b22c5-4226-48c7-a5c6-2fe795bebea7",
+                    "leftValue": "={{ $json.threat_level }}",
+                    "rightValue": "medium",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "861f2009-73a7-46d9-9b39-bc0ebc39d2ba",
+                    "leftValue": "={{ $json.threat_level }}",
+                    "rightValue": "low",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        -240
+      ],
+      "id": "952a88c8-efe6-40e7-82ff-b570d8a9f676",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1424,
+        -240
+      ],
+      "id": "d806874f-7d51-43b2-8ffe-88ef1d78826b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "tableId": "threat_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "host_name",
+              "fieldValue": "={{ $('Webhook').item.json.body.hostname }}"
+            },
+            {
+              "fieldId": "container_id",
+              "fieldValue": "={{ $('Webhook').item.json.body.container_id }}"
+            },
+            {
+              "fieldId": "source_ip",
+              "fieldValue": "={{ $('Webhook').item.json.body.source_ip }}"
+            },
+            {
+              "fieldId": "threat_level",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.threat_level }}"
+            },
+            {
+              "fieldId": "attack_type",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.attack_type }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.summary }}"
+            },
+            {
+              "fieldId": "recommended_actions",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.recommended_action }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        -224
+      ],
+      "id": "ab1bd7a7-8ba6-40dd-9730-685751bf6f36",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "=🚨 CRITICAL THREAT DETECTED — {{$json.attack_type}}",
+        "emailType": "text",
+        "message": "=A critical security threat was detected.\nSource IP: {{$json.source_ip}}\nAttack Type: {{$json.attack_type}} \nHostname: {{ $('Webhook').item.json.body.hostname }}\nSummary: {{$json.summary}}\n\nRecommended Action: {{$json.recommended_action}} \nTime: {{ $now }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        -448
+      ],
+      "id": "0aaba078-46d7-4bca-8e2a-2b208af7bf12",
+      "name": "Send a message",
+      "webhookId": "b206f2dc-b1cd-4766-b888-afc5929c152b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com ",
+        "subject": "==🛡️ SOC Intrusion Logged: [{{ $('Code in JavaScript').item.json.threat_level.toUpperCase() }}] - {{ $('Code in JavaScript').item.json.attack_type }}",
+        "emailType": "text",
+        "message": "==Security Event Logged to Threat Ledger:\n\nThreat Level: {{ $('Code in JavaScript').item.json.threat_level }}\nAttack Type: {{ $('Code in JavaScript').item.json.attack_type }}\nSource IP: {{ $('Webhook').item.json.body.source_ip }}\nHost / Container: {{ $('Webhook').item.json.body.hostname }} ({{ $('Webhook').item.json.body.container_id }})\n\nSummary:\n{{ $('Code in JavaScript').item.json.summary }}\n\nRecommended Action:\n{{ $('Code in JavaScript').item.json.recommended_action }}\n\nDatabase Record ID: {{ $json.id }}\nLog Timestamp: {{ $now }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1856,
+        -224
+      ],
+      "id": "ecdf8353-a1a9-4422-a684-13f878696f63",
+      "name": "Send a message1",
+      "webhookId": "05ddc7a7-5f23-4f9b-8f1a-114f4a05f341",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
