@@ -1,0 +1,495 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "NexumAI",
+        "options": {}
+      },
+      "id": "0e86af4e-c7b0-4828-a080-1c5445d07c09",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        144
+      ],
+      "webhookId": "17481144-4133-426f-a9cb-9ec8be3e8b73"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst bodyData = item.body || item || {};\n\n// Clean Base64 String (Removes \"data:application/pdf;base64,\" if present)\nlet base64 = bodyData.file_base64 || bodyData.original_cv || '';\nif (base64.includes('base64,')) {\n  base64 = base64.split('base64,')[1];\n}\n\nconst fileName = bodyData.file_name || 'resume.pdf';\n\nreturn [\n  {\n    json: {\n      candidate_name: bodyData.candidate_name || bodyData.name || 'Candidate',\n      candidate_email: bodyData.candidate_email || bodyData.email || '',\n      target_jd: bodyData.target_jd || bodyData.jd_text || '',\n      action_path: bodyData.action_path || bodyData.action || 'CV_TAILORING'\n    },\n    binary: {\n      file: {\n        data: base64,\n        mimeType: 'application/pdf',\n        fileName: fileName,\n        fileExtension: 'pdf'\n      }\n    }\n  }\n];"
+      },
+      "id": "123c4e90-f806-410e-9473-3a716f0434af",
+      "name": "Decode Base64 File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "file",
+        "options": {}
+      },
+      "id": "7c3d9fc9-3609-40ec-9868-c4d4f851396d",
+      "name": "Extract From PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst parsedText = item.text || item.data || '';\n\nlet candidateName = '';\nlet candidateEmail = '';\nlet targetJd = '';\nlet actionPath = '';\n\n// 1. READ DIRECTLY FROM WEBHOOK FIRST (Raw Input from Frontend)\ntry {\n  const webhookJson = $('Webhook').first()?.json || {};\n  const body = webhookJson.body || webhookJson;\n\n  candidateName = body.candidate_name || body.name || '';\n  candidateEmail = body.user_email || body.candidate_email || body.email || '';\n  targetJd = body.job_description || body.target_jd || body.jd_text || '';\n  actionPath = body.action_type || body.action_path || body.action || body.mode || body.path || body.type || '';\n} catch (e) {}\n\n// 2. Fallback to Decode Base64 / Other Nodes\nconst possibleNodes = ['Decode Base64 File', 'Decode Base64', 'Webhook'];\nfor (const nodeName of possibleNodes) {\n  try {\n    const nodeData = $(nodeName).first()?.json?.body || $(nodeName).first()?.json || {};\n    candidateName = candidateName || nodeData.candidate_name || nodeData.name;\n    candidateEmail = candidateEmail || nodeData.user_email || nodeData.candidate_email || nodeData.email;\n    targetJd = targetJd || nodeData.job_description || nodeData.target_jd || nodeData.jd_text;\n    actionPath = actionPath || nodeData.action_type || nodeData.action_path || nodeData.action;\n    if (candidateName && candidateEmail && targetJd && actionPath) break;\n  } catch (e) {}\n}\n\n// 3. Fallback logic for Email from PDF text\nif (!candidateEmail) {\n  const emailMatch = parsedText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\n  if (emailMatch) candidateEmail = emailMatch[0];\n}\n\n// 4. Candidate Name Cleaning Logic (Rejects sections/roles like EDUCATION/INTERN)\nconst invalidWords = [\n  'EDUCATION', 'EXPERIENCE', 'RESUME', 'CV', 'PROFILE', 'SUMMARY', 'SKILLS', \n  'CONTACT', 'CANDIDATE', 'UNASSIGNED', 'INTERN', 'STUDENT', 'DEVELOPER'\n];\n\nconst isValidName = (nameStr) => {\n  if (!nameStr || nameStr.length < 3 || nameStr.length > 50) return false;\n  const upper = nameStr.toUpperCase().trim();\n  if (invalidWords.some(word => upper.includes(word))) return false;\n  if (/[0-9@#$:%^*()_+={}\\[\\]|\\\\<>]/g.test(nameStr)) return false;\n  return true;\n};\n\nif (!isValidName(candidateName)) {\n  if (parsedText) {\n    const lines = parsedText.split('\\n').map(l => l.trim()).filter(l => l.length > 0);\n    for (const line of lines) {\n      if (isValidName(line)) {\n        candidateName = line;\n        break;\n      }\n    }\n  }\n}\n\n// 5. STRICT ACTION PATH NORMALIZATION (Enforces Capitalized Output for Switch Node)\nconst rawActionUpper = String(actionPath).toUpperCase().trim();\nlet finalActionPath = 'CV_TAILORING'; // Explicit default capital\n\nif (rawActionUpper.includes('INTERVIEW') || rawActionUpper.includes('SIM') || rawActionUpper === 'B') {\n  finalActionPath = 'INTERVIEW_SIMULATOR';\n} else {\n  finalActionPath = 'CV_TAILORING'; // Capitalized for Switch Node\n}\n\nreturn [\n  {\n    json: {\n      candidate_name: candidateName || 'Muhammad Sameer Qidwai',\n      candidate_email: candidateEmail || '',\n      target_jd: targetJd || '',\n      action_path: finalActionPath,\n      cv_content: parsedText\n    }\n  }\n];"
+      },
+      "id": "8fcb9667-55c5-4b36-8815-d4f9829335c3",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-cond-1",
+                    "leftValue": "={{ $json.action_path }}",
+                    "rightValue": "CV_TAILORING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-cond-2",
+                    "leftValue": "={{ $json.action_path }}",
+                    "rightValue": "INTERVIEW_SIMULATOR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none",
+          "ignoreCase": false
+        }
+      },
+      "id": "28431853-604e-45ca-8540-be0317b92f9e",
+      "name": "Switch1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -240,
+        144
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are an ATS Optimization & Career AI Specialist. Analyze the provided CV against the Target JD. Return STRICT JSON only, no markdown, no code fences, with exactly these keys: match_score (number 0-100), missing_keywords (array of strings), tailored_bullets (array of strings, rewritten CV bullet points using strong action verbs), summary (string, 2-3 sentence overview).",
+              "role": "system"
+            },
+            {
+              "content": "=Candidate Name: {{ $json.candidate_name }}\nTarget JD: {{ $json.target_jd }}\nCV Content: {{ $json.cv_content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e51c00f-d4dd-4b54-9b07-873c35b38b23",
+      "name": "Message a model (CV Tailor)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a Senior Technical Interviewer. Generate a tailored interview preparation deck based on the CV and JD. Return STRICT JSON only, no markdown, no code fences, with exactly these keys: technical_questions (array of strings), behavioral_questions (array of strings), situational_questions (array of strings), scoring_rubric (string).",
+              "role": "system"
+            },
+            {
+              "content": "=Candidate Name: {{ $json.candidate_name }}\nTarget JD: {{ $json.target_jd }}\nCV Content: {{ $json.cv_content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5fb5fec1-ed92-463a-9558-999b38cdaa9a",
+      "name": "Message a model (Interview Simulator)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [
+        0,
+        288
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const first = $input.first().json;\nconst raw = first.message?.content || first.content || first.text || JSON.stringify(first);\nconst parentData = $(\"Code in JavaScript\").first().json;\n\nlet cleaned = raw.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```\\s*$/i, '').trim();\n\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (e) {\n  data = { match_score: 'N/A', missing_keywords: [], tailored_bullets: [raw], summary: '' };\n}\n\nconst keywordsHtml = (data.missing_keywords || []).map(k => `<span style=\"display:inline-block;background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:12px;font-size:12px;margin:3px\">${k}</span>`).join('');\nconst bulletsHtml = (data.tailored_bullets || []).map(b => `<li style=\"margin-bottom:8px;line-height:1.5\">${b}</li>`).join('');\n\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1f2937\">\n  <div style=\"background:linear-gradient(135deg,#4f46e5,#06b6d4);padding:24px;border-radius:12px 12px 0 0;text-align:center\">\n    <h1 style=\"color:#fff;margin:0;font-size:20px\">Nexium AI — CV Tailoring Report</h1>\n  </div>\n  <div style=\"border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 12px 12px\">\n    <p>Hi <b>${parentData.candidate_name}</b>,</p>\n    <p>Here's your ATS optimization report against the target job description.</p>\n\n    <div style=\"background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;text-align:center;margin:20px 0\">\n      <p style=\"margin:0;font-size:13px;color:#166534\">ATS MATCH SCORE</p>\n      <p style=\"margin:4px 0 0;font-size:32px;font-weight:bold;color:#15803d\">${data.match_score}%</p>\n    </div>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Missing Keywords</h3>\n    <div style=\"margin-bottom:20px\">${keywordsHtml || '<i>None found — great match!</i>'}</div>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Tailored Bullet Points</h3>\n    <ul style=\"padding-left:20px\">${bulletsHtml}</ul>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Summary</h3>\n    <p style=\"line-height:1.6\">${data.summary || ''}</p>\n\n    <p style=\"margin-top:24px;font-size:12px;color:#9ca3af\">— Nexium AI Career Orchestrator</p>\n  </div>\n</div>`;\n\nreturn [\n  {\n    json: {\n      candidate_name: parentData.candidate_name,\n      candidate_email: parentData.candidate_email,\n      subject: \"Nexium AI - Your ATS Optimization & CV Tailoring Report\",\n      report_body: html,\n      action_path: parentData.action_path\n    }\n  }\n];"
+      },
+      "id": "6a3380fd-bb14-497a-939e-d70ce6ca60d8",
+      "name": "Code in JavaScript2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const first = $input.first().json;\nconst raw = first.message?.content || first.content || first.text || JSON.stringify(first);\nconst parentData = $(\"Code in JavaScript\").first().json;\n\nlet cleaned = raw.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```\\s*$/i, '').trim();\n\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (e) {\n  data = { technical_questions: [raw], behavioral_questions: [], situational_questions: [], scoring_rubric: '' };\n}\n\nconst listHtml = (arr) => (arr || []).map(q => `<li style=\"margin-bottom:8px;line-height:1.5\">${q}</li>`).join('');\n\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1f2937\">\n  <div style=\"background:linear-gradient(135deg,#4f46e5,#06b6d4);padding:24px;border-radius:12px 12px 0 0;text-align:center\">\n    <h1 style=\"color:#fff;margin:0;font-size:20px\">Nexium AI — Interview Preparation Deck</h1>\n  </div>\n  <div style=\"border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 12px 12px\">\n    <p>Hi <b>${parentData.candidate_name}</b>,</p>\n    <p>Here's your personalized interview prep based on the target role.</p>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Technical Questions</h3>\n    <ol style=\"padding-left:20px\">${listHtml(data.technical_questions)}</ol>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Behavioral Questions</h3>\n    <ol style=\"padding-left:20px\">${listHtml(data.behavioral_questions)}</ol>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Situational Questions</h3>\n    <ol style=\"padding-left:20px\">${listHtml(data.situational_questions)}</ol>\n\n    <h3 style=\"color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:6px\">Scoring Rubric</h3>\n    <p style=\"line-height:1.6\">${data.scoring_rubric || ''}</p>\n\n    <p style=\"margin-top:24px;font-size:12px;color:#9ca3af\">— Nexium AI Career Orchestrator</p>\n  </div>\n</div>`;\n\nreturn [\n  {\n    json: {\n      candidate_name: parentData.candidate_name,\n      candidate_email: parentData.candidate_email,\n      subject: \"Nexium AI - Your Personalized Interview Preparation Deck\",\n      report_body: html,\n      action_path: parentData.action_path\n    }\n  }\n];"
+      },
+      "id": "9aca25de-c97a-44b2-80cb-b1448afd1988",
+      "name": "Code in JavaScript1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.user_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.report_body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "caf77e46-4b90-44a0-a5eb-bcef962bb1ee",
+      "name": "Send a message1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "webhookId": "5ab99649-8368-44da-a624-13e124d1d6a9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.candidate_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.report_body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a7ad2bbe-0135-420b-816e-d4be408749f0",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        560,
+        288
+      ],
+      "webhookId": "bcd9e569-515e-4a7d-99a1-57822c89411c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "cv_tailoring_records",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "candidate_name",
+              "fieldValue": "={{ $('Code in JavaScript2').first().json.candidate_name }}"
+            },
+            {
+              "fieldId": "candidate_email",
+              "fieldValue": "={{ $('Code in JavaScript2').first().json.candidate_email }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript2').first().json.subject }}"
+            },
+            {
+              "fieldId": "report_body",
+              "fieldValue": "={{ $('Code in JavaScript2').first().json.report_body }}"
+            },
+            {
+              "fieldId": "action_path",
+              "fieldValue": "={{ $('Code in JavaScript2').first().json.action_path }}"
+            }
+          ]
+        }
+      },
+      "id": "5d7eac62-dbf9-4cb8-93d0-f07a84f2a536",
+      "name": "Create a row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "interview_sessions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "candidate_name",
+              "fieldValue": "={{ $('Code in JavaScript1').first().json.candidate_name }}"
+            },
+            {
+              "fieldId": "candidate_email",
+              "fieldValue": "={{ $('Code in JavaScript1').first().json.candidate_email }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript1').first().json.subject }}"
+            },
+            {
+              "fieldId": "report_body",
+              "fieldValue": "={{ $('Code in JavaScript1').first().json.report_body }}"
+            },
+            {
+              "fieldId": "action_path",
+              "fieldValue": "={{ $('Code in JavaScript1').first().json.action_path }}"
+            }
+          ]
+        }
+      },
+      "id": "6954e8b2-cc53-40bb-8c6d-b6def56e6821",
+      "name": "Create a row1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        288
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Decode Base64 File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Base64 File": {
+      "main": [
+        [
+          {
+            "node": "Extract From PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From PDF": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Message a model (CV Tailor)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model (Interview Simulator)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model (CV Tailor)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model (Interview Simulator)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
