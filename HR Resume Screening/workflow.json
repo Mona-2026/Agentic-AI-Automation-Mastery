@@ -1,0 +1,594 @@
+
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "HR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9e64af53-ae30-45a5-a4d9-b7f0d3ee0084",
+      "name": "Webhook",
+      "webhookId": "531eb57c-b902-4e9d-82c1-0ef40b11b475"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "resume",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "298a16c5-f79e-4527-bc49-9bfbb835b12b",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert technical recruiter and HR Manager. Your job is to strictly analyze the provided Candidate Resume against the target Job Description (JD).\n\nTarget Job Description:\nProblem-Solving • Networking and relationship building • Verbal and written communication • Video Editing • Content Strategy •\nTeamwork and Collaboration • Photography and Videography (Basic)\n\nInstructions:\n1.⁠ ⁠Extract the key technical skills from the resume.\n2.⁠ ⁠Provide a strict matching score between 0 and 100 based on how well the candidate matches the JD.\n3.⁠ ⁠Provide a brief 2-3 sentence technical justification/reason for this score.\n4. You must respond ONLY in a valid JSON format. Do not include markdown code blocks (like ⁠ json).\n\nExpected JSON Schema:\n{\n  \"match_score\": 85,\n  \"skills\": [\"React\", \"Next.js\", \"Kubernetes\", \"AWS\"],\n  \"reason\": \"The candidate has exceptional experience in both frontend and backend development with proven records of managing Kubernetes on AWS.\"\n}\n"
+            },
+            {
+              "content": "=Candidate Name: {{ $('Webhook').item.json.body.fullName }}\nCandidate Email: {{ $('Webhook').item.json.body.email }}\nWhy they want to join: {{ $('Webhook').item.json.body.whyJoin }}\n\nCandidate Resume Text: {{ $json.text }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "0e5ea1b0-5a9c-4882-a867-29028355e8c9",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "candidates",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('Webhook').item.json.body.fullName }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Webhook').item.json.body.email }}"
+            },
+            {
+              "fieldId": "reason",
+              "fieldValue": "={{ $json.output[0].content[0].text.reason }}"
+            },
+            {
+              "fieldId": "skills",
+              "fieldValue": "={{ $json.output[0].content[0].text.skills }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "Pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        768,
+        0
+      ],
+      "id": "6c82ec93-945a-499d-b440-567795ed7d9a",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "94200eec-575f-438d-bcc1-98c007c3f599",
+              "leftValue": "={{ $('Message a model').item.json.output[0].content[0].text.match_score }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        976,
+        0
+      ],
+      "id": "555030b8-681b-4ee8-863a-d382717e77ce",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "candidates",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook').item.json.body.email }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "Rejected"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        96
+      ],
+      "id": "cd7536cb-75fc-4b6f-aa2f-5eb6bd790a15",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=Write a very polite, encouraging, and empathetic rejection email to the candidate {{ $('Webhook').item.json.body.fullName }}. \nThank them for applying for the Full Stack/DevOps role. \nMention that while their profile is impressive, we are looking for someone who aligns slightly closer with our immediate technical stack needs at this moment. \nWish them the best for their future. Do not mention the exact AI score. Donot include subject line or donot include any starting or ending extra lines\nEnds exactly with:\nBest Regards,\nFarzeen Ali\nstarts directly with email body with candidate name."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1536,
+        96
+      ],
+      "id": "c752737e-dd29-421f-8daf-8903e4ecf9fc",
+      "name": "Message a model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "Thanks for applying",
+        "emailType": "text",
+        "message": "={{ $json.output[0].content[0].text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1904,
+        96
+      ],
+      "id": "a9de9709-4a19-467d-b4ff-849912287b89",
+      "name": "Send a message",
+      "webhookId": "5ca5f273-9a3e-4bce-b465-37f1df8a1f5b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=Write a short, professional internal email to the HR Manager (Muhammad Sameer). Inform her that a top candidate, {{ $('Webhook').item.json.body.fullName }}, has scored {{ $('Message a model').item.json.output[0].content[0].text.match_score }}/100 in the AI screening for the Video editing role.\nBriefly include the reasons: {{ $json.reason }}.\nAsk her to schedule an interview. Keep it concise.\nStarts directly with Email body with greeting donot add any starting or ending lines\nends exactly like this:\nBest Regards,\nMuhammad Sameer Qidwai\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        -96
+      ],
+      "id": "f3cc4ada-0b6f-4a19-b859-90f10439816e",
+      "name": "Message a model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "candidates",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook').item.json.body.email }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "Selected"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        -96
+      ],
+      "id": "7d929cd5-c434-4a05-b488-6bdccb94c5e5",
+      "name": "Update a row1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "iTEq9kBoy67JImvH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=Write a professional, short, and concise email body to the candidate informing them that they have been shortlisted for the Video editing role. Mention that the HR team will contact them soon to schedule their interview, and thank them for applying.\n\nStrict Constraints:\n1. Start directly with the email body greeting (e.g., Dear Candidate Name, or Hi [Name]).\n2. Do not include any Subject line, headers, preambles, or explanations before or after the text.\n3. Do not wrap the response in markdown code blocks like  ⁠text or ```html.\n4.⁠ ⁠The candidate's name is: {{ $('Webhook').item.json.body.fullName }}\n5.⁠ ⁠The final closing of the email must exactly be:\nBest Regards,\nMuhammad Sameer Qidwai\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2368,
+        -96
+      ],
+      "id": "68db1b9b-e5f0-46c6-9913-f9eb5a35b49a",
+      "name": "Message a model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "Congratulations!",
+        "emailType": "text",
+        "message": "={{ $json.output[0].content[0].text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2672,
+        -96
+      ],
+      "id": "bb2cf17f-5c14-4e0c-8912-55b19e4523ee",
+      "name": "Send a message1",
+      "webhookId": "8c83a9fe-553a-49af-94fd-8d39ec1f15fb",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "sameerkhurram2017@gmail.com",
+        "subject": "Candidate Selection",
+        "emailType": "text",
+        "message": "={{ $('Message a model2').item.json.output[0].content[0].text }}\n\nResume Summary: \n{{ $json.output[0].content[0].text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        -96
+      ],
+      "id": "4bcf15bd-8eae-45d0-b30c-5af96b800a02",
+      "name": "Send a message2",
+      "webhookId": "47551dc3-1d0a-4066-a2a1-4ab9a82e37f4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D11iyAlPhc7FXZzM",
+          "name": "Gmail OAuth Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a professional HR Assistant.\n\nYour task is to analyze the candidate's resume and generate a short, professional summary for HR recruiters.\n\nKeep the summary concise, clear, and easy to read."
+            },
+            {
+              "content": "=Analyze the following resume and generate a professional summary.\n\nThe summary should include:\n\n•⁠  ⁠Candidate Name\n•⁠  ⁠Education\n•⁠  ⁠Years of Experience\n•⁠  ⁠Technical Skills\n•⁠  ⁠Soft Skills\n•⁠  ⁠Suitable Job Role\n\nKeep the summary between 4 and 6 lines and strictly in paragraph form. keep the format email friendly no separate lines.\nResume: {{ $('Extract from File').item.json.text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1536,
+        -96
+      ],
+      "id": "baa4c751-9058-4877-9b06-45542c8020aa",
+      "name": "Message a model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "jYojCp9VGCOqGI1F",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Message a model2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model2": {
+      "main": [
+        [
+          {
+            "node": "Message a model4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row1": {
+      "main": [
+        [
+          {
+            "node": "Message a model3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model3": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model4": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b007d502eca30aee594799f2e1ea088ccf32a5f63a06ff82e0a0b114a812f6b2"
+  }
+}
